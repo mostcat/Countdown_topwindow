@@ -1,8 +1,10 @@
-# Countdown_topwindow 
+# Countdown_topwindow
+
+中文版本请查看 READM_CN.md
 
 ## Functionality
 
-### Stays on top of all windows
+- Stays on top of all windows
 
 - Window can be dragged across screens to desired position with mouse
 
