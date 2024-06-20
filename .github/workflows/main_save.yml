@@ -1,0 +1,26 @@
+name: 'Upload Image'
+description: 'Uploade Docker image as an artifact'
+inputs:
+  image:
+    description: 'short image name without repo/owner and tag, e.g. platformstorageapi'
+    required: true
+  artifact:
+    description: 'The artifact name uploaded by workflow_run workflow'
+    required: false
+    default: 'image'
+  token:
+    description: 'github token, <secrets.GITHUB_TOKEN>'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Export image
+      run: docker save -o ${{ inputs.image }}.tar ${{ inputs.image }}:latest
+      shell: bash
+    - name: Upload image artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact }}
+        path: ${{ inputs.image }}.tar
+        if-no-files-found: error
+        retention-days: 1
