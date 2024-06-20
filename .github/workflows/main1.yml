@@ -46,16 +46,11 @@ jobs:
           export sanitized_file=$(python3 sanitize_filename.py)
           export tar_file=${sanitized_file}.tar
           export gz_file=${tar_file}.gz
-          curl http://gosspublic.alicdn.com/ossutil/1.6.19/ossutil64 -o $HOME/ossutil64
-          chmod 755 $HOME/ossutil64
-          $HOME/ossutil64 config -e oss-cn-beijing.aliyuncs.com -i ${OSS_ACCESS_KEY_ID} -k ${OSS_ACCESS_KEY_SECRET}  -L EN -c $HOME/.ossutilconfig
+
           if [ "${COMPRESS}" = "1" ]; then
             docker pull ${IMG_NAME}
             docker save ${IMG_NAME} | gzip > ${gz_file}
-            $HOME/ossutil64 --update cp ${gz_file} ${OSSPATH}/${gz_file}
           else
             docker run --rm -v $PWD:$PWD -w $PWD ananace/skopeo copy docker://${IMG_NAME} dir:${sanitized_file}
             echo "${IMG_NAME}" > ${sanitized_file}.tag
-            $HOME/ossutil64 --update cp --recursive ${sanitized_file} ${OSSPATH}/${sanitized_file}
-            $HOME/ossutil64 --update cp ${sanitized_file}.tag ${OSSPATH}/${sanitized_file}.tag
           fi
