@@ -1,26 +1,63 @@
-name: 'Upload Image'
-description: 'Uploade Docker image as an artifact'
-inputs:
-  image:
-    description: 'short image name without repo/owner and tag, e.g. platformstorageapi'
-    required: true
-  artifact:
-    description: 'The artifact name uploaded by workflow_run workflow'
-    required: false
-    default: 'image'
-  token:
-    description: 'github token, <secrets.GITHUB_TOKEN>'
-    required: true
-runs:
-  using: "composite"
-  steps:
-    - name: Export image
-      run: docker save -o ${{ inputs.image }}.tar ${{ inputs.image }}:latest
-      shell: bash
-    - name: Upload image artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ inputs.artifact }}
-        path: ${{ inputs.image }}.tar
-        if-no-files-found: error
-        retention-days: 1
+name: Dowload docker img and upload to Aliyun
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [synchronize, opened, reopened, ready_for_review]
+    branches:
+      - "*"
+  workflow_dispatch:
+    inputs:
+      img:
+        description: "image to download, for instance, tensorflow/tensorflow"
+        required: true
+      compress:
+        description: "whether to compress the docker image, VM for github action has 14GB limit, if the image is too big, it is advised not to compress. set to 0 to skip compression"
+        default: "1"
+        required: false
+      ossPath:
+        default: "oss://oneflow-static/img"
+        required: false
+        description: ""
+jobs:
+  downloadDockerImg:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - env:
+          IMG_NAME: ${{ github.event.inputs.img }}
+          COMPRESS: ${{ github.event.inputs.compress }}
+          OSSPATH: ${{ github.event.inputs.ossPath }}
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+        run: |
+          echo ${{ contains(github.event.pull_request.labels.*.name, 'need-single-client-tests') }}
+          echo ${{ !contains(github.event.pull_request.labels.*.name, 'need-single-client-tests') }}
+          echo ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          IMG_NAME=${IMG_NAME:-"busybox"}
+          COMPRESS=${COMPRESS:-"1"}
+          OSSPATH=${OSSPATH:-"oss://oneflow-static/img"}
+          echo "GITHUB_RUN_ID:${GITHUB_RUN_ID}" 
+          set -x
+          set -o pipefail
+          python3 -m pip install pathvalidate
+          export sanitized_file=$(python3 sanitize_filename.py)
+          export tar_file=${sanitized_file}.tar
+          export gz_file=${tar_file}.gz
+
+          if [ "${COMPRESS}" = "1" ]; then
+            docker pull ${IMG_NAME}
+            docker save ${IMG_NAME} | gzip > ${gz_file}
+          else
+            docker run --rm -v $PWD:$PWD -w $PWD ananace/skopeo copy docker://${IMG_NAME} dir:${sanitized_file}
+            echo "${IMG_NAME}" > ${sanitized_file}.tag
+          fi
+			- name: Upload image artifact
+				      uses: actions/upload-artifact@v4
+				      with:
+				        name: ${{ inputs.artifact }}
+				        path: ${{ inputs.image }}.tar
+				        if-no-files-found: error
+				        retention-days: 1									
